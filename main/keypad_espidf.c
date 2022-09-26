@@ -39,24 +39,6 @@ uint64_t pins_mask(const gpio_num_t *pins_array, const uint32_t num_pins)
 }
 
 /**
- * @brief When a key is pressed, this function is called.
- *        So it save the last input dimansion, and with the
- *        last output dimansion it is possible to get the
- *        pressed key.
- * 
- * @param pvParameters  A keypad_input_info_t pointer, whitch
- *                      store the input pin for each added
- *                      handler.
- */
-void IRAM_ATTR keypad_isr_handler(void *pvParameters)
-{
-    keypad_input_info_t *kp_info = (keypad_input_info_t *) pvParameters;
-    kp_info->keypad->last_input = kp_info->id;
-    
-    xQueueSendFromISR(kp_info->keypad->queue, kp_info->keypad, NULL);
-}
-
-/**
  * @brief   This task task does a sequency of outputs, pulling
  *          the active pin down and all the others up.
  * 
@@ -81,6 +63,15 @@ void keypad_sequency_task(void *pvParameters)
             } else {
                 gpio_set_level(keypad->gpio_output[i], 1);
             }
+
+            for (uint32_t j = 0; j < keypad->num_gpio_in; j++) {
+                if (!gpio_get_level(keypad->gpio_input[j])) {
+                    keypad->last_input = j;
+                    xQueueSendToBack(keypad->queue, keypad, portMAX_DELAY);
+                }
+                
+            }
+            
         }
 
         if (++dim_turn > keypad->num_gpio_out) dim_turn = 0;
@@ -113,13 +104,17 @@ void keypad_install(keypad_settings_t *keypad)
     gpio_config(io_conf);
 
     //interrupt of rising edge
-    io_conf->intr_type = GPIO_INTR_POSEDGE;
-    //bit mask of the pins, use GPIO4/5 here
-    io_conf->pin_bit_mask = pins_mask(keypad->gpio_input, keypad->num_gpio_in);
+    // io_conf->intr_type = GPIO_INTR_NEGEDGE;
+    io_conf->intr_type = GPIO_INTR_DISABLE;
     //set as input mode
     io_conf->mode = GPIO_MODE_INPUT;
+    //bit mask of the pins, use GPIO4/5 here
+    io_conf->pin_bit_mask = pins_mask(keypad->gpio_input, keypad->num_gpio_in);
+    //disable pull-down mode
+    io_conf->pull_down_en = 0;
     //enable pull-up mode
-    io_conf->pull_up_en = 1;
+    io_conf->pull_up_en = 0; // Bad internal pull-up
+    //configure GPIO with the given settings
     gpio_config(io_conf);
 
     free(io_conf);
@@ -128,15 +123,4 @@ void keypad_install(keypad_settings_t *keypad)
     keypad->queue = xQueueCreate(10, sizeof(keypad_settings_t));
     //start gpio task
     xTaskCreate(keypad_sequency_task, "keypad_sequency_task", 2048, (void *) keypad, 10, NULL);
-
-    //install gpio isr service
-    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
-
-    keypad_input_info_t *kp_info = malloc(keypad->num_gpio_in * sizeof(keypad_input_info_t));
-
-    for (uint32_t i = 0; i < keypad->num_gpio_in; i++) {
-        kp_info[i].id = i;
-        kp_info[i].keypad = keypad;
-        gpio_isr_handler_add(keypad->gpio_input[i], keypad_isr_handler, (void *) &kp_info[i]);
-    }
 }

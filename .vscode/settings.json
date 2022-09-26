@@ -5,6 +5,7 @@
                 "portmacro.h": "c",
                 "core.h": "c",
                 "esp_newlib.h": "c",
-                "reent.h": "c"
+                "reent.h": "c",
+                "freertos.h": "c"
         }
 }

@@ -50,3 +50,10 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Build directory
+build/
+
+# Menuconfig
+sdkconfig
+sdkconfig.old

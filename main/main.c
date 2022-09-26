@@ -59,7 +59,7 @@ void app_main(void)
                 .num_gpio_in = NUM_ROW,
                 .gpio_output = pins_col,
                 .gpio_input = pins_row,
-                .frequency = 20,
+                .frequency = 10,
                 .last_output = -1,
                 .last_input = -1,
                 .queue = &keypad_queue,
